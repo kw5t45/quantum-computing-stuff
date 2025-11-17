@@ -1,7 +1,8 @@
 import pennylane as qml
 import numpy as np
 import matplotlib.pyplot as plt
-from plots import plot_phase_output
+from plots import plot_phase_output, plot_probability_distribution
+import math
 
 
 def qft_rotations(wires):
@@ -34,7 +35,7 @@ def qft(wires):
 
 
 # setting up a device
-n_qubits = 4
+n_qubits = 6
 dev = qml.device("default.qubit", wires=n_qubits)
 
 
@@ -49,8 +50,6 @@ def qft_circuit_4bit(binary_num: str):
     if binary_num[-4] == '1':
         qml.PauliX(wires=3)
 
-
-
     # Apply QFT
     qft(range(n_qubits))
     return qml.state()
@@ -58,24 +57,26 @@ def qft_circuit_4bit(binary_num: str):
 
 @qml.qnode(dev)
 
-def superposition():
-
-    state = np.zeros(2**n_qubits, dtype=complex)
-    for idx in [0, 2, 4, 6, 8, 10, 12, 14]:
-        state[idx] = 1/4  # amplitude = 0.5
+def qft_superposition(n_qubits, state):
 
     qml.StatePrep(state, wires=range(n_qubits), normalize=True)
 
-    # Εδώ εφαρμόζεις την QFT (υπόθεση ότι έχεις ορίσει qml.QFT ή την έγραψες)
     qml.QFT(wires=range(n_qubits))
 
     return qml.state()
 
+
 # qml.draw_mpl(qft_circuit(), decimals=2, style="sketch")()
 # plt.show()
 
-#state = qft_circuit_4bit('1010')
 
-state = superposition()
+state = np.zeros(2 ** n_qubits, dtype=complex)
+superposition_indexes = [i for i in range(0, 2**6, 2)]
+for idx in superposition_indexes:
+    state[idx] = 1 / math.sqrt(len(superposition_indexes))  # equal amplitude superposition of above list/
+
+state = qft_superposition(6, state)
 print(state)
-plot_phase_output(state)
+
+# spacing -> 2^n/period
+plot_probability_distribution(state, 6, save=True)
