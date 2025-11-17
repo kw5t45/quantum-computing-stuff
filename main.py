@@ -4,7 +4,6 @@ import matplotlib.pyplot as plt
 from plots import plot_phase_output, plot_probability_distribution
 import math
 
-
 def qft_rotations(wires):
     """ recursive applicaiton of controlled phase shift"""
 
@@ -56,9 +55,7 @@ def qft_circuit_4bit(binary_num: str):
 
 
 @qml.qnode(dev)
-
 def qft_superposition(n_qubits, state):
-
     qml.StatePrep(state, wires=range(n_qubits), normalize=True)
 
     qml.QFT(wires=range(n_qubits))
@@ -71,11 +68,12 @@ def qft_superposition(n_qubits, state):
 
 
 state = np.zeros(2 ** n_qubits, dtype=complex)
-superposition_indexes = [i for i in range(0, 2**6, 2)]
+superposition_indexes = [i for i in range(0, 2 ** 6, 2)]
 for idx in superposition_indexes:
-    state[idx] = 1 / math.sqrt(len(superposition_indexes))  # equal amplitude superposition of above list/
+    state[idx] = 1 / math.sqrt(len(superposition_indexes))  # equal normalized amplitude superposition of above list/
 
 state = qft_superposition(6, state)
+
 print(state)
 
 # spacing -> 2^n/period

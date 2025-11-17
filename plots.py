@@ -1,9 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-def plot_phase_output(state, n_qubits, save=False):
 
-
+def plot_phase_output(state, n_qubits, save=False, save_name='phase_img'):
     phases = np.angle(state)
 
     plt.bar(range(2 ** n_qubits), phases)
@@ -12,11 +11,11 @@ def plot_phase_output(state, n_qubits, save=False):
     plt.title("Phase distribution after QFT")
 
     if save:
-        plt.savefig('phase_distrubtion.png')
+        plt.savefig(f'{save_name}.png')
     plt.show()
 
-def plot_probability_distribution(state, n_qubits, save=False):
 
+def plot_probability_distribution(state, n_qubits, save=False, save_name='prob_img'):
     probabilities = np.abs(state) ** 2
 
     plt.bar(range(2 ** n_qubits), probabilities)
@@ -25,6 +24,5 @@ def plot_probability_distribution(state, n_qubits, save=False):
     plt.title("Probability distribution after QFT")
 
     if save:
-        plt.savefig('probability_distribution.png')
+        plt.savefig(f'{save_name}.png')
     plt.show()
-
