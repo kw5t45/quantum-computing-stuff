@@ -3,72 +3,67 @@ import math
 from PIL import Image
 import numpy as np
 import pennylane as qml
+import matplotlib.pyplot as plt
 
-img = Image.open("mnist_digit_5.png").convert('L')  # 'L' converts to grayscale
-
+# mnist 5 image
+img = Image.open(r"resources/mnist_digit_5.png").convert('L')
 img_array = np.array(img)
 
-img_1d = img_array.flatten()
+rows, cols = img_array.shape  # 28x28
+pixels = rows * cols
 
+img_1d = img_array.flatten()
 amplitudes = img_1d / np.linalg.norm(img_1d)
 
-n_qubits = math.ceil(math.log(len(amplitudes), 2))
 
+plt.imshow(img, cmap='gray')
+plt.axis('off')
+plt.title("Input")
+plt.show()
+
+# x, y, and total qubits
+nx = math.ceil(math.log2(rows))  # 5
+ny = math.ceil(math.log2(cols))  # 5
+n_qubits = nx + ny               # 10
+
+# state size and norm
 state = np.zeros(2 ** n_qubits, dtype=complex)
-state[:len(amplitudes)] = amplitudes
-state = state / np.linalg.norm(state)
+state[:pixels] = amplitudes
+state /= np.linalg.norm(state)
 
-print(len(state))
-print(state)
+print("Total qubits:", n_qubits)
+print("Amplitude vector length:", len(state))
 
-# plot_probability_distribution(state, 10)
 
 dev = qml.device("default.qubit", wires=n_qubits)
 
-
 @qml.qnode(dev)
-def qft_superposition(n_qubits, state):
+def qft_2d(state):
     qml.StatePrep(state, wires=range(n_qubits), normalize=True)
 
-    qml.QFT(wires=range(n_qubits))
+    # QFT on row qubits (first nx)
+    qml.QFT(wires=range(nx))
+
+    # QFT on column qubits (last ny)
+    qml.QFT(wires=range(nx, nx+ny))
 
     return qml.state()
 
 
-# plot_probability_distribution(state, n_qubits, save=True, save_name='img_superposition_state')
+state_qft = qft_2d(state)
+print(state_qft)
 
-state_qft = qft_superposition(n_qubits, state=state)
+# image reconstruct
+def reconstruct_image_from_state(state, shape=(28, 28)):
+    num = shape[0] * shape[1]
+    amps = state[:num]
 
-# plot_probability_distribution(state_qft, n_qubits, save=True, save_name='qft_superosition_state')
-# plot_phase_output(state_qft, n_qubits, save=True, save_name='qft_phase')
-#
+    # magnitudes = frequency intensity
+    img = np.abs(amps)
+    img /= np.max(img)
 
-def reconstruct_image_from_state(state, image_shape=(28, 28)):
-    """
-    reconstruct a grayscale image from a quantum state vector.
+    return img.reshape(shape)
 
-    state (np.ndarray): complex quantum state vector (length >= product of image_shape)
-    image_shape (tuple): shape of the original image
+reconstructed = reconstruct_image_from_state(state_qft)
 
-    return np.ndarray: Reconstructed 2D grayscale image with values 0-1.
-    """
-    # take the first pixels (if padded)
-    num_pixels = image_shape[0] * image_shape[1]
-    amplitudes = state[:num_pixels]
-
-    # convert amplitudes to pixel intensities
-    pixels = np.abs(amplitudes)
-
-    # normalize to 0-1
-    pixels = pixels / np.max(pixels)
-
-    # Reshape to 2D image
-    img = pixels.reshape(image_shape)
-
-    return img
-
-reconstructed_img = reconstruct_image_from_state(state_qft)
-
-plt.imshow(reconstructed_img, cmap='gray')
-plt.axis('off')
-plt.show()
+plot_probability_distribution(state_qft, n_qubits, save=True, save_name='2d_qft_mnist')
