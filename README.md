@@ -39,7 +39,7 @@ For the above image for example, the phases after the QFT are:
 
 and the probability amplitudes now become:
 
-<img src="resources/qft_superposition_state.png" alt="model" width="500" title="test"/>
+<img src="resources/qft_superosition_state.png" alt="model" width="500" title="test"/>
 
 Since the amplitudes are known, the superposition state can be de-converted back the the original image using the Inverse QFT.
 
