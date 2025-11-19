@@ -25,7 +25,7 @@ Assuming a $n x m$ greyscale image, we can store the image as a quantum state, a
 the bits to superposition amplitudes. For example, assuming the image below, which is the hand-drawn digit
 "5" from the MNIST dataset:
 
-<img src="resources/mnist_digit_5.png" alt="model" width="500" title="test"/>
+<img src="resources/mnist_digit_5.png" alt="model" width="100" title="test"/>
 
 This image can be stored as a 10 qubit superposition $(floor(log_2(nxm)))$ where each probability amplitude 
 represents a pixel value:
