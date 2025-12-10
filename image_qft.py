@@ -6,6 +6,20 @@ import pennylane as qml
 import matplotlib.pyplot as plt
 import numpy as np
 
+path = "resources/baboon.png"
+
+img = Image.open(path).convert("L")   # "L" = 8-bit grayscale
+img_resized = img.resize((128, 128), Image.BICUBIC)
+
+# Convert to numpy array
+img_array_o = np.array(img_resized)
+
+# Plot
+# plt.imshow(img_array_o, cmap="gray", vmin=0, vmax=255)
+# plt.title("Grayscale Image")
+# plt.axis("off")
+# plt.show()
+
 def nass_encode_image(path, size=(128, 128)):
 
     img = Image.open(rf"{path}").convert('L')
@@ -93,6 +107,67 @@ def classic_fft(img_array, shift=True, magnitude=True, log_scale=True, reshape=T
     if reshape:
         return fft.reshape(reshape_size)
     return fft
+
+def classic_ifft(fft_state,
+                 shifted=True,
+                 magnitude=False,
+                 log_scaled=False,
+                 original_phase=None,
+                 reshape=True,
+                 reshape_size=(128, 128)):
+    """
+    Reconstruct an image from a 2D FFT output.
+
+    Parameters
+    ----------
+    fft_state : ndarray
+        The Fourier-domain data produced by classic_fft.
+    shifted : bool
+        Whether fft_state was fftshifted.
+    magnitude : bool
+        If True, fft_state contains only magnitude (|F|).
+        Requires original_phase to reconstruct.
+    log_scaled : bool
+        If True, fft_state was log1p() scaled, so undo exp()-1.
+    original_phase : ndarray or None
+        Required if magnitude=True. Must contain the phase of the original FFT.
+    reshape : bool
+        Whether to reshape the output to reshape_size.
+    reshape_size : (int, int)
+        Final output shape.
+
+    Returns
+    -------
+    img_reconstructed : ndarray
+        Real-valued reconstructed image.
+    """
+
+    F = fft_state.copy().astype(complex)
+
+    # --- Undo log scaling ---
+    if log_scaled:
+        F = np.expm1(F)   # inverse of log1p
+
+    # --- Undo magnitude-only (requires phase) ---
+    if magnitude:
+        if original_phase is None:
+            raise ValueError("Reconstruction from magnitude-only FFT requires original_phase.")
+        F = F * np.exp(1j * original_phase)
+
+    # --- Undo shift ---
+    if shifted:
+        F = np.fft.ifftshift(F)
+
+    # --- Inverse FFT ---
+    img_complex = np.fft.ifft2(F)
+
+    # Take real part (imag is numerical noise)
+    img = np.real(img_complex)
+
+    if reshape:
+        img = img.reshape(reshape_size)
+
+    return img
 
 # image reconstruct
 def nass_extract_frequency_image(state, fft_shift=True, magnitude=True, log_scale=True, reshape=True, shape=(128, 128)):
@@ -222,8 +297,126 @@ def neqr_extract_frequency_image(state, b=8, nx=7, ny=7):
     return freq_img
 
 
+@qml.qnode(dev)
+def inverse_qft_2d_neqr(qft_state, b, nx, ny):
+    """
 
-path = "resources/baboon.png"
-# state_neqr, b, neqr_x, neqr_y = neqr_encode_image(path)
+    :param qft_state: qft state
+    :param b: greyscale bits
+    :param nx: x bits
+    :param ny: y bits
+    :return: neqr state after application of 2d qft
+    """
+
+    n_qubits = b + nx + ny
+
+    # Load QFT-transformed state
+    qml.StatePrep(qft_state, wires=range(n_qubits), normalize=True)
+
+    # Inverse QFT on x-qubits (columns)
+    qml.adjoint(qml.QFT)(wires=range(b + ny, b + ny + nx))
+
+    # Inverse QFT on y-qubits (rows)
+    qml.adjoint(qml.QFT)(wires=range(b, b + ny))
+
+
+    return qml.state()
+def plot_neqr_state(state, b, nx, ny, plot=False) -> list | np.ndarray:
+    """
+
+    :param state: neqr qft DECODED state to be plotted
+    :param b: number of grayscale bits
+    :param nx:  -- x bits
+    :param ny:    y bits
+    :return: returns original image array reconstructed from neqr state
+    """
+
+    # Image dimensions
+    W = 2**nx
+    H = 2**ny
+    img = np.zeros((H, W))
+
+    # Iterate through all basis states
+    for idx, amp in enumerate(state):
+        prob = np.abs(amp)**2
+        if prob == 0:
+            continue
+
+        # Convert basis index → bitstring
+        bits = np.binary_repr(idx, width=b + nx + ny)
+
+        # Partition bits: [grayscale][y][x]
+        g_bits = bits[:b]
+        y_bits = bits[b:b+ny]
+        x_bits = bits[b+ny:]
+
+        # Decode values
+        gray = int(g_bits, 2)
+        y = int(y_bits, 2)
+        x = int(x_bits, 2)
+
+        # Accumulate (for superposed states)
+        img[y, x] += gray * prob
+
+    N = 2 ** nx * 2 ** ny
+    img_scaled = img * N
+    if plot:
+        plt.imshow(img_scaled, cmap="gray", vmin=0, vmax=2 ** b - 1)
+        plt.title("Reconstructed NEQR Image")
+        plt.colorbar(label="Pixel Value")
+        plt.show()
+
+    return img
+def plot_nass_state(state, nx, ny, original_norm, plot=True):
+    W = 2**nx
+    H = 2**ny
+    img = np.zeros((H, W))
+
+    for idx, amp in enumerate(state):
+        prob = np.abs(amp)**2
+        if prob == 0:
+            continue
+
+        bits = np.binary_repr(idx, width=nx + ny)
+        y_bits = bits[:ny]
+        x_bits = bits[ny:]
+        y = int(y_bits, 2)
+        x = int(x_bits, 2)
+
+        img[y, x] = np.sqrt(prob) * original_norm   # <-- FIX
+
+    if plot:
+        plt.imshow(img, cmap="gray", vmin=0, vmax=255)
+        plt.title("Reconstructed NASS Image")
+        plt.colorbar()
+        plt.show()
+
+    return img
+
+state_neqr, b, neqr_x, neqr_y = neqr_encode_image(path)
 state_nass, nass_x, nass_y = nass_encode_image(path)
-print(state_nass)
+psi_qft = qft_2d_neqr(state_neqr, b, neqr_x, neqr_y)
+
+psi_original = inverse_qft_2d_neqr(psi_qft, b, neqr_x, neqr_y)
+
+
+
+neqr_corr = plot_neqr_state(psi_original, b, neqr_x, neqr_y, plot=False)
+
+original_norm = np.linalg.norm(img_array_o.flatten())
+
+nass_corr = plot_nass_state(state_nass, nass_x, nass_y, plot=False, original_norm=original_norm)
+
+fft_img = classic_fft(img_array_o,
+                      shift=True,
+                      magnitude=False,
+                      log_scale=False)
+phase = np.angle(np.fft.fft2(img_array_o))
+
+img_rec_fft = classic_ifft(fft_img,
+                       shifted=True,
+                       magnitude=False,
+                       log_scaled=False)
+
+
+plot_four_images_with_mse_maps(img_array_o, neqr_corr, nass_corr, img_rec_fft)
