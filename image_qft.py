@@ -45,6 +45,119 @@ def nass_encode_image(path, size=(128, 128)):
 
     return state, nx, ny
 
+def neqr_encode_image(path, size=(128, 128)):
+    """
+    Load a grayscale image and return its NEQR statevector.
+
+    Returns:
+        statevector: complex numpy array of size 2^(b + nx + ny)
+        b : number of pixel-value qubits (8)
+        nx: number of x-position qubits
+        ny: number of y-position qubits
+    """
+
+    # ----------------
+    # Load image
+    # ----------------
+    img = Image.open(path).convert('L')
+    img = img.resize(size, Image.BICUBIC)
+    img_array = np.array(img)
+
+    rows, cols = img_array.shape
+
+    # Pixel-value qubits (8 bits for grayscale 0–255)
+    b = 8
+
+    # Position qubits
+    nx = math.ceil(math.log2(rows))
+    ny = math.ceil(math.log2(cols))
+
+    # Total qubits
+    N = b + nx + ny
+
+    # Dimension of NEQR Hilbert space
+    dim = 2 ** N
+
+    # Initialize statevector
+    state = np.zeros(dim, dtype=np.complex128)
+
+    # ----------------
+    # Encode NEQR basis states
+    # ----------------
+    # Bit layout: |f0 f1 ... f7  x_{nx-1} ... x_0  y_{ny-1} ... y_0>
+    #
+    # For each pixel (x,y), we build its integer basis index.
+    # ----------------
+
+    for x in range(rows):
+        for y in range(cols):
+            pixel_val = img_array[x, y]  # 0..255
+
+            # Bits
+            f_bits = pixel_val
+            x_bits = x << ny
+            xy_bits = x_bits | y
+
+            # Combine to full basis index
+            index = (f_bits << (nx + ny)) | xy_bits
+
+            # Amplitude = 1 / sqrt(rows*cols)
+            state[index] = 1.0
+
+    # Normalize
+    state /= np.linalg.norm(state)
+
+    return state, b, nx, ny
+
+def frqi_encode_image(path, size=(128, 128)):
+    """
+    Converts an image into an FRQI state vector representation.
+
+    Parameters:
+        path (str): Image file path.
+        size (tuple): Image resize dimensions (must be 2^n × 2^n).
+
+    Returns:
+        state (np.ndarray): Complex FRQI quantum state vector.
+        n (int): Number of qubits for each axis (image is 2^n × 2^n).
+    """
+
+    # Load image in grayscale
+    img = Image.open(path).convert('L')
+    img = img.resize(size, Image.BICUBIC)
+    img_array = np.array(img, dtype=float)
+
+    # Dimensions must be 2^n x 2^n
+    rows, cols = img_array.shape
+    if rows != cols or (rows & (rows - 1)) != 0:
+        raise ValueError("FRQI requires dimensions 2^n × 2^n")
+
+    n = int(math.log2(rows))
+    n_pixels = rows * cols
+
+    # Flatten pixels
+    pixels = img_array.flatten()
+
+    # Convert pixel intensities [0..255] → angles θ_i in [0..π/2]
+    thetas = (np.pi / 2) * (pixels / 255.0)
+
+    # FRQI state vector size is 2^(2n+1)
+    total_states = 2 ** (2 * n + 1)
+
+    # Output FRQI state vector
+    state = np.zeros(total_states, dtype=complex)
+
+    # Populate amplitude for each pixel position i:
+    # |i,0> = cos(theta_i)
+    # |i,1> = sin(theta_i)
+    for i in range(n_pixels):
+        state[2 * i]     = np.cos(thetas[i])  # |0⟩ color qubit
+        state[2 * i + 1] = np.sin(thetas[i])  # |1⟩ color qubit
+
+    # Normalize entire state vector
+    state = state / np.linalg.norm(state)
+
+    return state, n
 
 n_qubits = 22
 dev = qml.device("default.qubit", wires=22)
@@ -62,7 +175,39 @@ def qft_2d_nass(state, nx, ny):
 
     return qml.state()
 
-dev = qml.device("default.qubit", wires=22)
+def qft_2d_frqi(state, n):
+    """
+    Applies a 2D QFT to an FRQI-encoded quantum image.
+
+    Parameters:
+        state (np.ndarray): FRQI state vector of length 2^(2n+1)
+        n (int): log2(image dimension), e.g. n=7 for 128x128
+
+    Returns:
+        np.ndarray: The QFT-transformed state vector.
+    """
+
+    n_qubits = 1 + 2 * n                       # 1 color + 2n position qubits
+    dev = qml.device("default.qubit", wires=n_qubits)
+
+    @qml.qnode(dev)
+    def circuit():
+        # Load the FRQI state
+        qml.StatePrep(state, wires=range(n_qubits), normalize=True)
+
+        # Position qubits only (skip the color qubit)
+        row_wires = list(range(1, 1 + n))
+        col_wires = list(range(1 + n, 1 + 2*n))
+
+        # 2D QFT: QFT on rows, then QFT on columns
+        qml.QFT(wires=row_wires)
+        qml.QFT(wires=col_wires)
+
+        return qml.state()
+
+    return circuit()
+
+dev = qml.device("default.qubit", wires=15)
 @qml.qnode(dev)
 def qft_2d_neqr(state, b, nx, ny):
     n_qubits = b + nx + ny
@@ -88,6 +233,7 @@ def classic_fft(img_array, shift=True, magnitude=True, log_scale=True, reshape=T
     :param reshape: reshape back to square - ready for plotting
     :param reshape_size: reshape size.
     :return:
+
     """
     # Compute the 2D FFT
     fft = np.fft.fft2(img_array)
@@ -204,69 +350,6 @@ def nass_extract_frequency_image(state, fft_shift=True, magnitude=True, log_scal
 
     return freqs
 
-def neqr_encode_image(path, size=(128, 128)):
-    """
-    Load a grayscale image and return its NEQR statevector.
-
-    Returns:
-        statevector: complex numpy array of size 2^(b + nx + ny)
-        b : number of pixel-value qubits (8)
-        nx: number of x-position qubits
-        ny: number of y-position qubits
-    """
-
-    # ----------------
-    # Load image
-    # ----------------
-    img = Image.open(path).convert('L')
-    img = img.resize(size, Image.BICUBIC)
-    img_array = np.array(img)
-
-    rows, cols = img_array.shape
-
-    # Pixel-value qubits (8 bits for grayscale 0–255)
-    b = 8
-
-    # Position qubits
-    nx = math.ceil(math.log2(rows))
-    ny = math.ceil(math.log2(cols))
-
-    # Total qubits
-    N = b + nx + ny
-
-    # Dimension of NEQR Hilbert space
-    dim = 2 ** N
-
-    # Initialize statevector
-    state = np.zeros(dim, dtype=np.complex128)
-
-    # ----------------
-    # Encode NEQR basis states
-    # ----------------
-    # Bit layout: |f0 f1 ... f7  x_{nx-1} ... x_0  y_{ny-1} ... y_0>
-    #
-    # For each pixel (x,y), we build its integer basis index.
-    # ----------------
-
-    for x in range(rows):
-        for y in range(cols):
-            pixel_val = img_array[x, y]  # 0..255
-
-            # Bits
-            f_bits = pixel_val
-            x_bits = x << ny
-            xy_bits = x_bits | y
-
-            # Combine to full basis index
-            index = (f_bits << (nx + ny)) | xy_bits
-
-            # Amplitude = 1 / sqrt(rows*cols)
-            state[index] = 1.0
-
-    # Normalize
-    state /= np.linalg.norm(state)
-
-    return state, b, nx, ny
 def neqr_extract_frequency_image(state, b=8, nx=7, ny=7):
     """
     Extract the 128x128 2D Fourier image from the NEQR+QFT statevector.
@@ -296,31 +379,60 @@ def neqr_extract_frequency_image(state, b=8, nx=7, ny=7):
 
     return freq_img
 
-
-@qml.qnode(dev)
-def inverse_qft_2d_neqr(qft_state, b, nx, ny):
+@qml.qnode(qml.device("default.qubit", wires=15))
+def inverse_qft_frqi(frqi_state, n):
     """
-
-    :param qft_state: qft state
-    :param b: greyscale bits
-    :param nx: x bits
-    :param ny: y bits
-    :return: neqr state after application of 2d qft
+    Inverse 2D QFT on FRQI image.
+    n: log2(image dimension), e.g. 7 for 128x128
     """
+    n_qubits = 1 + 2 * n  # 1 color + 2n position qubits
+    qml.StatePrep(frqi_state, wires=range(n_qubits), normalize=True)
 
-    n_qubits = b + nx + ny
+    # Position qubits only
+    row_wires = list(range(1, 1 + n))
+    col_wires = list(range(1 + n, 1 + 2*n))
 
-    # Load QFT-transformed state
-    qml.StatePrep(qft_state, wires=range(n_qubits), normalize=True)
-
-    # Inverse QFT on x-qubits (columns)
-    qml.adjoint(qml.QFT)(wires=range(b + ny, b + ny + nx))
-
-    # Inverse QFT on y-qubits (rows)
-    qml.adjoint(qml.QFT)(wires=range(b, b + ny))
-
+    # Inverse 2D QFT: rows then columns
+    qml.adjoint(qml.QFT)(wires=row_wires)
+    qml.adjoint(qml.QFT)(wires=col_wires)
 
     return qml.state()
+
+
+def frqi_state_to_image(qml_state, n):
+    """
+    Convert a quantum state (FRQI) to a 2D image array.
+
+    Args:
+        qml_state (array): Quantum state vector after inverse QFT.
+        n (int): log2(image dimension), e.g. 7 for 128x128 image.
+
+    Returns:
+        image (2D np.array): Image with values in [0,1].
+    """
+    dim = 2 ** n  # image dimension
+    num_pixels = dim * dim
+    image = np.zeros((dim, dim))
+
+    # Each amplitude: |color>|position> => color qubit is the first one
+    for idx in range(num_pixels):
+        # Map idx to row/col
+        row = idx // dim
+        col = idx % dim
+
+        # Get amplitudes for color qubit being |0> and |1>
+        # position index starts from qubit 1
+        zero_idx = idx * 2  # color qubit = 0
+        one_idx = idx * 2 + 1  # color qubit = 1
+
+        # FRQI encodes color as theta in first qubit: |0> cos(theta) + |1> sin(theta)
+        theta = np.arctan2(np.abs(qml_state[one_idx]), np.abs(qml_state[zero_idx]))
+
+        # Map theta to grayscale [0,1]
+        image[row, col] = np.sin(theta) ** 2  # sin^2(theta) gives normalized pixel value
+
+    return image
+
 def plot_neqr_state(state, b, nx, ny, plot=False) -> list | np.ndarray:
     """
 
@@ -393,30 +505,46 @@ def plot_nass_state(state, nx, ny, original_norm, plot=True):
 
     return img
 
-state_neqr, b, neqr_x, neqr_y = neqr_encode_image(path)
-state_nass, nass_x, nass_y = nass_encode_image(path)
-psi_qft = qft_2d_neqr(state_neqr, b, neqr_x, neqr_y)
 
-psi_original = inverse_qft_2d_neqr(psi_qft, b, neqr_x, neqr_y)
+state, n = frqi_encode_image(path, size=(128,128))
+print(len(state))
+qft_state = qft_2d_frqi(state, n)
+print(len(qft_state))
+inv_state = inverse_qft_frqi(qft_state, n)
 
+# Convert the quantum state to a 2D image
+reconstructed_img = frqi_state_to_image(inv_state, n)
 
-
-neqr_corr = plot_neqr_state(psi_original, b, neqr_x, neqr_y, plot=False)
-
-original_norm = np.linalg.norm(img_array_o.flatten())
-
-nass_corr = plot_nass_state(state_nass, nass_x, nass_y, plot=False, original_norm=original_norm)
-
-fft_img = classic_fft(img_array_o,
-                      shift=True,
-                      magnitude=False,
-                      log_scale=False)
-phase = np.angle(np.fft.fft2(img_array_o))
-
-img_rec_fft = classic_ifft(fft_img,
-                       shifted=True,
-                       magnitude=False,
-                       log_scaled=False)
-
-
-plot_four_images_with_mse_maps(img_array_o, neqr_corr, nass_corr, img_rec_fft)
+# Plot the reconstructed image
+plt.figure(figsize=(6,6))
+plt.imshow(reconstructed_img, cmap='gray', vmin=0, vmax=1)
+plt.axis('off')
+plt.title("Reconstructed FRQI Image")
+plt.show()
+# state_neqr, b, neqr_x, neqr_y = neqr_encode_image(path)
+# state_nass, nass_x, nass_y = nass_encode_image(path)
+# psi_qft = qft_2d_neqr(state_neqr, b, neqr_x, neqr_y)
+#
+# psi_original = inverse_qft_2d_neqr(psi_qft, b, neqr_x, neqr_y)
+#
+#
+#
+# neqr_corr = plot_neqr_state(psi_original, b, neqr_x, neqr_y, plot=False)
+#
+# original_norm = np.linalg.norm(img_array_o.flatten())
+#
+# nass_corr = plot_nass_state(state_nass, nass_x, nass_y, plot=False, original_norm=original_norm)
+#
+# fft_img = classic_fft(img_array_o,
+#                       shift=True,
+#                       magnitude=False,
+#                       log_scale=False)
+# phase = np.angle(np.fft.fft2(img_array_o))
+#
+# img_rec_fft = classic_ifft(fft_img,
+#                        shifted=True,
+#                        magnitude=False,
+#                        log_scaled=False)
+#
+#
+# plot_four_images_with_mse_maps(img_array_o, neqr_corr, nass_corr, img_rec_fft)
