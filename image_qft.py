@@ -21,6 +21,12 @@ img_array_o = np.array(img_resized)
 # plt.show()
 
 def nass_encode_image(path, size=(128, 128)):
+    """
+
+    :param path: path of img
+    :param size: size of img
+    :return: nass encoded complex array representing given image.
+    """
 
     img = Image.open(rf"{path}").convert('L')
     img = img.resize(size, Image.BICUBIC)
@@ -45,7 +51,17 @@ def nass_encode_image(path, size=(128, 128)):
 
     return state, nx, ny
 
-def neqr_encode_image(path, size=(128, 128)):
+def neqr_encode_image(path, size=(128, 128)) -> tuple:
+    """
+
+    :param path: load img from path
+    :param size: size of image
+    :return: np array state vector representing neqr image. should be size 2^(b + nx + ny)
+    :return: number of color qubits - 8
+    :return: number of x --
+    :return: number of y --
+
+    """
     """
     Load a grayscale image and return its NEQR statevector.
 
@@ -109,17 +125,13 @@ def neqr_encode_image(path, size=(128, 128)):
 
     return state, b, nx, ny
 
-def frqi_encode_image(path, size=(128, 128)):
+def frqi_encode_image(path, size=(128, 128)) -> tuple:
     """
-    Converts an image into an FRQI state vector representation.
 
-    Parameters:
-        path (str): Image file path.
-        size (tuple): Image resize dimensions (must be 2^n × 2^n).
-
-    Returns:
-        state (np.ndarray): Complex FRQI quantum state vector.
-        n (int): Number of qubits for each axis (image is 2^n × 2^n).
+    :param path: path of image
+    :param size: size of image which should be 2^n
+    :return: state: complex frqi state vector
+    :return:  n: number of qubits for each axis
     """
 
     # Load image in grayscale
@@ -165,6 +177,13 @@ dev = qml.device("default.qubit", wires=22)
 
 @qml.qnode(dev)
 def qft_2d_nass(state, nx, ny):
+    """
+
+    :param state: nass state vector of image
+    :param nx: number of  x qubits
+    :param ny:  --- y bits
+    :return: applies qft on 2d nsas state
+    """
     qml.StatePrep(state, wires=range(n_qubits), normalize=True)
 
     # row qubit qft
@@ -177,14 +196,10 @@ def qft_2d_nass(state, nx, ny):
 
 def qft_2d_frqi(state, n):
     """
-    Applies a 2D QFT to an FRQI-encoded quantum image.
 
-    Parameters:
-        state (np.ndarray): FRQI state vector of length 2^(2n+1)
-        n (int): log2(image dimension), e.g. n=7 for 128x128
-
-    Returns:
-        np.ndarray: The QFT-transformed state vector.
+    :param state: frqi state vector len 2^(2n+1)
+    :param n: number of x and y qubits (shouldl be log2 image dim - 7 for 128x128)
+    :return: nd array of qft transformed state.
     """
 
     n_qubits = 1 + 2 * n                       # 1 color + 2n position qubits
@@ -210,6 +225,14 @@ def qft_2d_frqi(state, n):
 dev = qml.device("default.qubit", wires=15)
 @qml.qnode(dev)
 def qft_2d_neqr(state, b, nx, ny):
+    """
+
+    :param state: neqr state vector
+    :param b: number of color qubits
+    :param nx: number of x qubits
+    :param ny:  --- y qubits
+    :return: applies qft on state
+    """
     n_qubits = b + nx + ny
 
     # Load NEQR/NASS state
@@ -262,31 +285,17 @@ def classic_ifft(fft_state,
                  reshape=True,
                  reshape_size=(128, 128)):
     """
-    Reconstruct an image from a 2D FFT output.
 
-    Parameters
-    ----------
-    fft_state : ndarray
-        The Fourier-domain data produced by classic_fft.
-    shifted : bool
-        Whether fft_state was fftshifted.
-    magnitude : bool
-        If True, fft_state contains only magnitude (|F|).
-        Requires original_phase to reconstruct.
-    log_scaled : bool
-        If True, fft_state was log1p() scaled, so undo exp()-1.
-    original_phase : ndarray or None
-        Required if magnitude=True. Must contain the phase of the original FFT.
-    reshape : bool
-        Whether to reshape the output to reshape_size.
-    reshape_size : (int, int)
-        Final output shape.
-
-    Returns
-    -------
-    img_reconstructed : ndarray
-        Real-valued reconstructed image.
+    :param fft_state: fourier domain data produced by classic fft
+    :param shifted: whether fft was shifted to centre
+    :param magnitude: if true, fft_state contains only magnitude, which then requires original phase to reconstruct
+    :param log_scaled: if was log1p
+    :param original_phase: if mag=True
+    :param reshape: bool to reshape to size (int int)
+    :param reshape_size:  --
+    :return: real valued reconstructed img aarray
     """
+
 
     F = fft_state.copy().astype(complex)
 
@@ -352,13 +361,12 @@ def nass_extract_frequency_image(state, fft_shift=True, magnitude=True, log_scal
 
 def neqr_extract_frequency_image(state, b=8, nx=7, ny=7):
     """
-    Extract the 128x128 2D Fourier image from the NEQR+QFT statevector.
 
-    state: full QFT-transformed statevector (length 2^(b+nx+ny))
-    b: number of value qubits
-    nx, ny: number of x and y qubits
-
-    returns: complex array (128 x 128)
+    :param state: qft transformed state vector - should be length 2^(b +nx + ny)
+    :param b: color value cubits
+    :param nx:
+    :param ny:
+    :return: complex array (img)
     """
     rows = 2**nx
     cols = 2**ny
@@ -382,8 +390,10 @@ def neqr_extract_frequency_image(state, b=8, nx=7, ny=7):
 @qml.qnode(qml.device("default.qubit", wires=15))
 def inverse_qft_frqi(frqi_state, n):
     """
-    Inverse 2D QFT on FRQI image.
-    n: log2(image dimension), e.g. 7 for 128x128
+
+    :param frqi_state: frqi state after qft is applied.
+    :param n: number of qubits
+    :return: original frqi state which (should) represent encoded image
     """
     n_qubits = 1 + 2 * n  # 1 color + 2n position qubits
     qml.StatePrep(frqi_state, wires=range(n_qubits), normalize=True)
@@ -401,14 +411,10 @@ def inverse_qft_frqi(frqi_state, n):
 
 def frqi_state_to_image(qml_state, n):
     """
-    Convert a quantum state (FRQI) to a 2D image array.
 
-    Args:
-        qml_state (array): Quantum state vector after inverse QFT.
-        n (int): log2(image dimension), e.g. 7 for 128x128 image.
-
-    Returns:
-        image (2D np.array): Image with values in [0,1].
+    :param qml_state: frqi quantum state
+    :param n: total number of x qubits (=y, and 1 is for greyscale)
+    :return: img array
     """
     dim = 2 ** n  # image dimension
     num_pixels = dim * dim
@@ -480,6 +486,15 @@ def plot_neqr_state(state, b, nx, ny, plot=False) -> list | np.ndarray:
 
     return img
 def plot_nass_state(state, nx, ny, original_norm, plot=True):
+    """
+
+    :param state: given nass state
+    :param nx: number of x qubits
+    :param ny: number of y qubits
+    :param original_norm:  original normalization
+    :param plot: plot or not
+    :return:
+    """
     W = 2**nx
     H = 2**ny
     img = np.zeros((H, W))
@@ -521,6 +536,7 @@ plt.imshow(reconstructed_img, cmap='gray', vmin=0, vmax=1)
 plt.axis('off')
 plt.title("Reconstructed FRQI Image")
 plt.show()
+
 # state_neqr, b, neqr_x, neqr_y = neqr_encode_image(path)
 # state_nass, nass_x, nass_y = nass_encode_image(path)
 # psi_qft = qft_2d_neqr(state_neqr, b, neqr_x, neqr_y)
