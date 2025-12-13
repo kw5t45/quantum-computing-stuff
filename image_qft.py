@@ -222,7 +222,7 @@ def qft_2d_frqi(state, n):
 
     return circuit()
 
-dev = qml.device("default.qubit", wires=15)
+dev = qml.device("default.qubit", wires=22)
 @qml.qnode(dev)
 def qft_2d_neqr(state, b, nx, ny):
     """
@@ -408,7 +408,30 @@ def inverse_qft_frqi(frqi_state, n):
 
     return qml.state()
 
+@qml.qnode(dev)
+def inverse_qft_2d_neqr(qft_state, b, nx, ny):
+    """
 
+    :param qft_state: qft state
+    :param b: greyscale bits
+    :param nx: x bits
+    :param ny: y bits
+    :return: neqr state after application of 2d qft
+    """
+
+    n_qubits = b + nx + ny
+
+    # Load QFT-transformed state
+    qml.StatePrep(qft_state, wires=range(n_qubits), normalize=True)
+
+    # Inverse QFT on x-qubits (columns)
+    qml.adjoint(qml.QFT)(wires=range(b + ny, b + ny + nx))
+
+    # Inverse QFT on y-qubits (rows)
+    qml.adjoint(qml.QFT)(wires=range(b, b + ny))
+
+
+    return qml.state()
 def frqi_state_to_image(qml_state, n):
     """
 
@@ -521,46 +544,46 @@ def plot_nass_state(state, nx, ny, original_norm, plot=True):
     return img
 
 
+
+
+
+
+# FRQI image state
+
 state, n = frqi_encode_image(path, size=(128,128))
-print(len(state))
 qft_state = qft_2d_frqi(state, n)
-print(len(qft_state))
 inv_state = inverse_qft_frqi(qft_state, n)
+frqi_reconstructed = frqi_state_to_image(inv_state, n)
 
-# Convert the quantum state to a 2D image
-reconstructed_img = frqi_state_to_image(inv_state, n)
+# NEQR image
+state_neqr, b, neqr_x, neqr_y = neqr_encode_image(path)
+qft_neqr_state = qft_2d_neqr(state_neqr, b, neqr_x, neqr_y)
+neqr_reconstructed = inverse_qft_2d_neqr(qft_neqr_state, b, neqr_x, neqr_y)
+neqr_corr = plot_neqr_state(neqr_reconstructed, b, neqr_x, neqr_y, plot=False)
 
-# Plot the reconstructed image
-plt.figure(figsize=(6,6))
-plt.imshow(reconstructed_img, cmap='gray', vmin=0, vmax=1)
-plt.axis('off')
-plt.title("Reconstructed FRQI Image")
-plt.show()
+# NASS state
+state_nass, nass_x, nass_y = nass_encode_image(path)
+original_norm = np.linalg.norm(img_array_o.flatten())
+nass_corr = plot_nass_state(state_nass, nass_x, nass_y, plot=False, original_norm=original_norm)
 
-# state_neqr, b, neqr_x, neqr_y = neqr_encode_image(path)
-# state_nass, nass_x, nass_y = nass_encode_image(path)
-# psi_qft = qft_2d_neqr(state_neqr, b, neqr_x, neqr_y)
-#
-# psi_original = inverse_qft_2d_neqr(psi_qft, b, neqr_x, neqr_y)
-#
-#
-#
-# neqr_corr = plot_neqr_state(psi_original, b, neqr_x, neqr_y, plot=False)
-#
-# original_norm = np.linalg.norm(img_array_o.flatten())
-#
-# nass_corr = plot_nass_state(state_nass, nass_x, nass_y, plot=False, original_norm=original_norm)
-#
-# fft_img = classic_fft(img_array_o,
-#                       shift=True,
-#                       magnitude=False,
-#                       log_scale=False)
-# phase = np.angle(np.fft.fft2(img_array_o))
-#
-# img_rec_fft = classic_ifft(fft_img,
-#                        shifted=True,
-#                        magnitude=False,
-#                        log_scaled=False)
-#
-#
-# plot_four_images_with_mse_maps(img_array_o, neqr_corr, nass_corr, img_rec_fft)
+
+# classic FFT
+fft_img = classic_fft(img_array_o,
+                      shift=True,
+                      magnitude=False,
+                      log_scale=False)
+phase = np.angle(np.fft.fft2(img_array_o))
+
+img_rec_fft = classic_ifft(fft_img,
+                       shifted=True,
+                       magnitude=False,
+                       log_scaled=False)
+
+
+plot_four_images_with_mse_maps(
+    img_array_o,
+    neqr_corr,
+    nass_corr,
+    img_rec_fft,
+    frqi_reconstructed
+)
