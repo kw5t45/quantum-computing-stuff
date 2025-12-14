@@ -432,33 +432,35 @@ def inverse_qft_2d_neqr(qft_state, b, nx, ny):
 
 
     return qml.state()
-def frqi_state_to_image(qml_state, n):
-    """
 
-    :param qml_state: frqi quantum state
-    :param n: total number of x qubits (=y, and 1 is for greyscale)
-    :return: img array
-    """
-    dim = 2 ** n  # image dimension
+
+def frqi_state_to_image(qml_state, n):
+    dim = 2 ** n
     num_pixels = dim * dim
     image = np.zeros((dim, dim))
 
-    # Each amplitude: |color>|position> => color qubit is the first one
     for idx in range(num_pixels):
-        # Map idx to row/col
         row = idx // dim
         col = idx % dim
 
-        # Get amplitudes for color qubit being |0> and |1>
-        # position index starts from qubit 1
         zero_idx = idx * 2  # color qubit = 0
         one_idx = idx * 2 + 1  # color qubit = 1
 
-        # FRQI encodes color as theta in first qubit: |0> cos(theta) + |1> sin(theta)
-        theta = np.arctan2(np.abs(qml_state[one_idx]), np.abs(qml_state[zero_idx]))
+        amp0 = qml_state[zero_idx]
+        amp1 = qml_state[one_idx]
 
-        # Map theta to grayscale [0,1]
-        image[row, col] = np.sin(theta) ** 2  # sin^2(theta) gives normalized pixel value
+        # Normalize (account for 1/sqrt(num_pixels) factor)
+        norm = np.sqrt(np.abs(amp0) ** 2 + np.abs(amp1) ** 2)
+        amp0 /= norm
+        amp1 /= norm
+
+        # Extract theta from the amplitudes
+        # |ψ⟩ = cos(θ)|0⟩ + sin(θ)|1⟩
+        # So θ = arctan2(|amp1|, |amp0|) or arcsin(|amp1|)
+        theta = np.arctan2(np.abs(amp1), np.abs(amp0))  # θ ∈ [0, π/2]
+
+        # Convert back to grayscale: g = (θ / (π/2)) × 255
+        image[row, col] = (theta / (np.pi / 2)) * 255
 
     return image
 

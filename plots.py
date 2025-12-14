@@ -48,7 +48,7 @@ def plot_four_images_with_mse_maps(img1, img2, img3, img4, img5):
     img2_scaled = img2 * N
 
     # --- Ensure FRQI is scaled to [0,255] ---
-    img5_scaled = img5 * 255.0
+    img5_scaled = img5
 
     # --- Compute MSE maps ---
     diff12 = (img1 - img2_scaled) ** 2
@@ -128,13 +128,12 @@ def plot_four_images_with_mse_maps(img1, img2, img3, img4, img5):
     # ----------------------------
     mse_maps = [diff12, diff13, diff14, diff15]
     mse_vals = [mse12, mse13, mse14, mse15]
-    mse_titles = [
-        f"MSE Map: NEQR vs Original\nMSE = {mse12:.4f}",
-        f"MSE Map: NASS vs Original\nMSE = {mse13:.4f}",
-        f"MSE Map: FFT vs Original\nMSE = {mse14:.4f}",
-        f"MSE Map: FRQI vs Original\nMSE = {mse15:.4f}",
+    mse_titles = [ # scientific notation assuming small mses which is the case
+        f"MSE Map: NEQR vs Original\nMSE = {mse12:.2e}",
+        f"MSE Map: NASS vs Original\nMSE = {mse13:.2e}",
+        f"MSE Map: FFT vs Original\nMSE = {mse14:.2e}",
+        f"MSE Map: FRQI vs Original\nMSE = {mse15:.2e}",
     ]
-
     for i in range(4):
         plt.subplot(2, 5, 7 + i)
         plt.imshow(mse_maps[i], cmap="hot")
