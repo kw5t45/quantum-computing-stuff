@@ -547,45 +547,48 @@ def plot_nass_state(state, nx, ny, original_norm, plot=True):
 
 
 
+#
+#
+#
+# # FRQI image state
+#
+# state, n = frqi_encode_image(path, size=(128,128))
+# qft_state = qft_2d_frqi(state, n)
+# inv_state = inverse_qft_frqi(qft_state, n)
+# frqi_reconstructed = frqi_state_to_image(inv_state, n)
+#
+# # NEQR image
+# state_neqr, b, neqr_x, neqr_y = neqr_encode_image(path)
+# print(f'encoded state len {len(state_neqr)}')
+# qft_neqr_state = qft_2d_neqr(state_neqr, b, neqr_x, neqr_y)
+# print(f'encoded state after qft len {len(state_neqr)}')
+# neqr_reconstructed = inverse_qft_2d_neqr(qft_neqr_state, b, neqr_x, neqr_y)
+# print(f'encoded state after inv qft len {len(state_neqr)}')
+# neqr_corr = plot_neqr_state(neqr_reconstructed, b, neqr_x, neqr_y, plot=False)
+# print(f'encoded state after img reconstruction len {len(state_neqr)}')
+# # NASS state
+# state_nass, nass_x, nass_y = nass_encode_image(path)
+# original_norm = np.linalg.norm(img_array_o.flatten())
+# nass_corr = plot_nass_state(state_nass, nass_x, nass_y, plot=False, original_norm=original_norm)
+#
+#
+# # classic FFT
+# fft_img = classic_fft(img_array_o,
+#                       shift=True,
+#                       magnitude=False,
+#                       log_scale=False)
+# phase = np.angle(np.fft.fft2(img_array_o))
+#
+# img_rec_fft = classic_ifft(fft_img,
+#                        shifted=True,
+#                        magnitude=False,
+#                        log_scaled=False)
+#
 
-
-
-# FRQI image state
-
-state, n = frqi_encode_image(path, size=(128,128))
-qft_state = qft_2d_frqi(state, n)
-inv_state = inverse_qft_frqi(qft_state, n)
-frqi_reconstructed = frqi_state_to_image(inv_state, n)
-
-# NEQR image
-state_neqr, b, neqr_x, neqr_y = neqr_encode_image(path)
-qft_neqr_state = qft_2d_neqr(state_neqr, b, neqr_x, neqr_y)
-neqr_reconstructed = inverse_qft_2d_neqr(qft_neqr_state, b, neqr_x, neqr_y)
-neqr_corr = plot_neqr_state(neqr_reconstructed, b, neqr_x, neqr_y, plot=False)
-
-# NASS state
-state_nass, nass_x, nass_y = nass_encode_image(path)
-original_norm = np.linalg.norm(img_array_o.flatten())
-nass_corr = plot_nass_state(state_nass, nass_x, nass_y, plot=False, original_norm=original_norm)
-
-
-# classic FFT
-fft_img = classic_fft(img_array_o,
-                      shift=True,
-                      magnitude=False,
-                      log_scale=False)
-phase = np.angle(np.fft.fft2(img_array_o))
-
-img_rec_fft = classic_ifft(fft_img,
-                       shifted=True,
-                       magnitude=False,
-                       log_scaled=False)
-
-
-plot_four_images_with_mse_maps(
-    img_array_o,
-    neqr_corr,
-    nass_corr,
-    img_rec_fft,
-    frqi_reconstructed
-)
+# plot_four_images_with_mse_maps(
+#     img_array_o,
+#     neqr_corr,
+#     nass_corr,
+#     img_rec_fft,
+#     frqi_reconstructed
+# )
