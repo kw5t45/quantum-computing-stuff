@@ -1,6 +1,10 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
+import matplotlib.pyplot as plt
 
+from skimage.metrics import peak_signal_noise_ratio as psnr
+from skimage.metrics import structural_similarity as ssim
 
 def plot_phase_output(state, n_qubits, save=False, save_name='phase_img'):
     phases = np.angle(state)
@@ -28,11 +32,7 @@ def plot_probability_distribution(state, n_qubits, save=False, save_name='prob_i
     plt.show()
 
 
-import numpy as np
-import matplotlib.pyplot as plt
 
-from skimage.metrics import peak_signal_noise_ratio as psnr
-from skimage.metrics import structural_similarity as ssim
 
 def plot_four_images_with_mse_maps(img1, img2, img3, img4, img5):
     """

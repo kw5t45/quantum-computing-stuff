@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
-def reconstruct_nass_state(state, nx, ny, original_norm, plot=True):
+def reconstruct_nass_state(state, nx, ny, original_norm, plot=False):
     """
 
     :param state: given nass state
@@ -38,53 +38,56 @@ def reconstruct_nass_state(state, nx, ny, original_norm, plot=True):
     return img
 
 
-def reconstruct_neqr_state(state, b, nx, ny, plot=False) -> list | np.ndarray:
-    """
+def reconstruct_neqr_state(state, b, nx, ny, plot=False):
 
-    :param state: neqr qft DECODED state to be plotted
-    :param b: number of grayscale bits
-    :param nx:  -- x bits
-    :param ny:    y bits
-    :return: returns original image array reconstructed from neqr state
-    """
-
-    # Image dimensions
     W = 2**nx
     H = 2**ny
-    img = np.zeros((H, W))
 
-    # Iterate through all basis states
+    img = np.zeros((H,W))
+
     for idx, amp in enumerate(state):
+
         prob = np.abs(amp)**2
+
         if prob == 0:
             continue
 
-        # Convert basis index → bitstring
-        bits = np.binary_repr(idx, width=b + nx + ny)
+        bits = np.binary_repr(
+            idx,
+            width=b+nx+ny
+        )
 
-        # Partition bits: [grayscale][y][x]
         g_bits = bits[:b]
+
         y_bits = bits[b:b+ny]
+
         x_bits = bits[b+ny:]
 
-        # Decode values
-        gray = int(g_bits, 2)
-        y = int(y_bits, 2)
-        x = int(x_bits, 2)
+        gray = int(g_bits,2)
 
-        # Accumulate (for superposed states)
-        img[y, x] += gray * prob
+        y = int(y_bits,2)
 
-    N = 2 ** nx * 2 ** ny
-    img_scaled = img * N
+        x = int(x_bits,2)
+
+        img[y,x] += gray * prob
+
+    # compensate for equal-position superposition
+    N = 2**(nx+ny)
+
+    img = img * N
+
     if plot:
-        plt.imshow(img_scaled, cmap="gray", vmin=0, vmax=2 ** b - 1)
-        plt.title("Reconstructed NEQR Image")
-        plt.colorbar(label="Pixel Value")
+
+        plt.imshow(
+            img,
+            cmap="gray",
+            vmin=0,
+            vmax=(2**b)-1
+        )
+
         plt.show()
 
     return img
-
 
 def reconstruct_frqi_state(qml_state, n):
     dim = 2 ** n

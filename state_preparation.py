@@ -22,7 +22,8 @@ def nass_encode_image(path, size=(128, 128)):
     pixels = rows * cols
 
     img_1d = img_array.flatten()
-    amplitudes = img_1d / np.linalg.norm(img_1d)
+    original_norm = np.linalg.norm(img_1d)
+    amplitudes = img_1d / original_norm
 
     # x, y, and total qubits
     nx = math.ceil(math.log2(rows))
@@ -35,7 +36,7 @@ def nass_encode_image(path, size=(128, 128)):
     state /= np.linalg.norm(state)
 
 
-    return state, nx, ny
+    return state, nx, ny, original_norm
 
 def neqr_encode_image(path, size=(128, 128)) -> tuple:
     """
@@ -95,8 +96,6 @@ def neqr_encode_image(path, size=(128, 128)) -> tuple:
         for y in range(cols):
             pixel_val = img_array[x, y]  # 0..255
 
-            # Bits
-            f_bits = pixel_val
             x_bits = x << ny
             xy_bits = x_bits | y
 
@@ -117,6 +116,7 @@ def frqi_encode_image(path, size=(128, 128)) -> tuple:
     :param size: size of image which should be 2^n
     :return: state: complex frqi state vector
     :return:  n: number of qubits for each axis
+    SHOULD BE 15 TOTAL QUBITS FOR 128X128 IMAGE, = 32768 AMPLITUDES
     """
 
     # Load image in grayscale
@@ -124,7 +124,7 @@ def frqi_encode_image(path, size=(128, 128)) -> tuple:
     img = img.resize(size, Image.BICUBIC)
     img_array = np.array(img, dtype=float)
 
-    # Dimensions must be 2^n x 2^n
+    # dimensions must be 2^n x 2^n
     rows, cols = img_array.shape
     if rows != cols or (rows & (rows - 1)) != 0:
         raise ValueError("FRQI requires dimensions 2^n × 2^n")
@@ -153,5 +153,5 @@ def frqi_encode_image(path, size=(128, 128)) -> tuple:
 
     # Normalize entire state vector
     state = state / np.linalg.norm(state)
-
+    print(state)
     return state, n
