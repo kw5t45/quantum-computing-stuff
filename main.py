@@ -19,8 +19,8 @@ gt = gt.resize((128,128), Image.BICUBIC)
 gt = np.array(gt, dtype=np.float64)
 
 # reconstructed images
-#nass_image = timer(convert_deconvert_image_qcht_nass)(path)
-#neqr_image = timer(convert_deconvert_image_qcht_neqr)(path)
+nass_image = timer(convert_deconvert_image_qcht_nass)(path)
+neqr_image = timer(convert_deconvert_image_qcht_neqr)(path)
 frqi_image = timer(convert_deconvert_image_qcht_frqi)(path)
 
 
@@ -57,45 +57,6 @@ def evaluate(name, reconstructed, ground_truth):
     print(f"PSNR : {psnr:.4e} dB")
     print(f"SSIM : {ssim:.4e}")
 
-#evaluate("NASS", nass_image, gt)
-#evaluate("NEQR", neqr_image, gt)
-frqi_image = frqi_image.reshape(gt.shape)
-
-print(frqi_image.shape, gt.shape)
-print(frqi_image)
+evaluate("NASS", nass_image, gt)
+evaluate("NEQR", neqr_image, gt)
 evaluate("FRQI", frqi_image, gt)
-
-
-import matplotlib.pyplot as plt
-
-
-plt.figure(figsize=(8, 4))
-
-plt.subplot(1, 2, 1)
-plt.imshow(gt, cmap="gray")
-plt.title("Ground Truth")
-plt.axis("off")
-
-plt.subplot(1, 2, 2)
-plt.imshow((frqi_image), cmap="gray")
-plt.title("Reconstructed")
-plt.axis("off")
-
-plt.tight_layout()
-plt.show()
-
-
-plt.subplot(1, 2, 1)
-plt.hist(gt.ravel(), bins=256, range=(0, 256), color="blue", alpha=0.7)
-plt.title("Ground Truth Histogram")
-plt.xlabel("Pixel Intensity")
-plt.ylabel("Frequency")
-
-plt.subplot(1, 2, 2)
-plt.hist(np.real(frqi_image).ravel(), bins=256, range=(0, 256), color="orange", alpha=0.7)
-plt.title("Reconstructed Histogram")
-plt.xlabel("Pixel Intensity")
-plt.ylabel("Frequency")
-
-plt.tight_layout()
-plt.show()

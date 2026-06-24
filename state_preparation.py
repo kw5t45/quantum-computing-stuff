@@ -78,19 +78,12 @@ def neqr_encode_image(path, size=(128, 128)) -> tuple:
     # Total qubits
     N = b + nx + ny
 
-    # Dimension of NEQR Hilbert space
     dim = 2 ** N
 
-    # Initialize statevector
     state = np.zeros(dim, dtype=np.complex128)
 
-    # ----------------
-    # Encode NEQR basis states
-    # ----------------
+
     # Bit layout: |f0 f1 ... f7  x_{nx-1} ... x_0  y_{ny-1} ... y_0>
-    #
-    # For each pixel (x,y), we build its integer basis index.
-    # ----------------
 
     for x in range(rows):
         for y in range(cols):
@@ -153,5 +146,4 @@ def frqi_encode_image(path, size=(128, 128)) -> tuple:
 
     # Normalize entire state vector
     state = state / np.linalg.norm(state)
-    print(state)
     return state, n

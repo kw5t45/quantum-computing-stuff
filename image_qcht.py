@@ -134,7 +134,6 @@ def qcht_on_neqr_image(state, b, nx, ny):
     """
     total_qubits = b + nx + ny
 
-
     x_wires = list(range(b, b + nx))
     y_wires = list(range(b + nx, total_qubits))
     aux_wire = total_qubits  # auxiliary qubit
@@ -149,6 +148,7 @@ def qcht_on_neqr_image(state, b, nx, ny):
     QChT([aux_wire] + y_wires)
 
     return qml.state()
+
 
 @qml.qnode(dev)
 def qcht_on_nass_image(state, nx, ny):
@@ -185,6 +185,7 @@ def qcht_on_nass_image(state, nx, ny):
     QChT([aux_wire] + y_wires)
 
     return qml.state()
+
 
 @qml.qnode(dev)
 def inverse_from_statevector(statevec, N):
@@ -228,6 +229,8 @@ def inverse_qcht_image_neqr(state, b, nx, ny):
     qml.adjoint(lambda: QChT([aux_wire] + x_wires))()
 
     return qml.state()
+
+
 @qml.qnode(dev)
 def inverse_qcht_image_nass(state, nx, ny):
     """
@@ -272,6 +275,7 @@ def inverse_qcht_image_nass(state, nx, ny):
 
     return qml.state()
 
+
 @qml.qnode(dev)
 def qcht_on_frqi_image(state, n):
     """
@@ -315,6 +319,7 @@ def qcht_on_frqi_image(state, n):
     QChT([aux_wire] + y_wires)
 
     return qml.state()
+
 
 @qml.qnode(dev)
 def inverse_qcht_image_frqi(state, n):
@@ -364,6 +369,7 @@ def inverse_qcht_image_frqi(state, n):
 
     return qml.state()
 
+
 def convert_deconvert_image_qcht_neqr(image_path, image_size=(128, 128)) -> np.ndarray:
     """
 
@@ -387,6 +393,13 @@ def convert_deconvert_image_qcht_neqr(image_path, image_size=(128, 128)) -> np.n
 
     transformed_image = timer(qcht_on_neqr_image)(state_neqr, b, neqr_x, neqr_y)
     # print(len(transformed_image))  # = 8388608 FOR 128 IMAGE, because 2^[aux (1) + 8 (bits) + 7x + 7y] = 8388608
+    amps = np.abs(transformed_image)
+
+    print(np.count_nonzero(amps > 1e-10))
+    print(amps.max(), amps.min(), amps.mean())
+
+    # threshold = 1e-06
+    # transformed_image[np.abs(transformed_image) < threshold] = 0
 
     reconstructed_image = timer(inverse_qcht_image_neqr)(transformed_image, b, neqr_x, neqr_y)
     # extract only states where auxiliary qubit is |0⟩
@@ -397,16 +410,30 @@ def convert_deconvert_image_qcht_neqr(image_path, image_size=(128, 128)) -> np.n
         # index where auxiliary (last qubit) is 0
         reconstructed_image_traced[i] = reconstructed_image[i * 2]
 
-    aux_1_slice = reconstructed_image[1::2]  # aux = |1⟩
-    print(f"max amplitude in aux=|1⟩ slice: {np.max(np.abs(aux_1_slice)):.20e}")
-    print(f"max amplitude in aux=|0⟩ slice: {np.max(np.abs(reconstructed_image[0::2])):.20e}")
-    # renormalization
+    # aux_1_slice = reconstructed_image[1::2]  # aux = |1⟩
+    # print(f"max amplitude in aux=|1⟩ slice: {np.max(np.abs(aux_1_slice)):.4e}")
+    # data = np.abs(reconstructed_image[0::2])
+    #
+    # print(f"Number of amplitudes : {len(data)}")
+    # print(f"Min amplitude        : {data.min():.4e}")
+    # print(f"Max amplitude        : {data.max():.4e}")
+    # print(f"Mean amplitude       : {data.mean():.4e}")
+    # print(f"Median amplitude     : {np.median(data):.4e}")
+    # print(f"Std deviation        : {data.std():.4e}")
+    # # renormalization
+    #
+    # amps = np.abs(reconstructed_image_traced)
+    #
+    # print(">=1e-3 :", np.count_nonzero(amps > 1e-3))
+    # print(">=1e-4 :", np.count_nonzero(amps > 1e-4))
+    # print(">=1e-5 :", np.count_nonzero(amps > 1e-5))
+    # print(">=1e-10:", np.count_nonzero(amps > 1e-10))
+
     reconstructed_image_traced = reconstructed_image_traced / np.linalg.norm(reconstructed_image_traced)
     reconstructed_image_neqr = timer(reconstruct_neqr_state)(reconstructed_image_traced, b, neqr_x, neqr_y)
 
     # back to array
     img_recon_neqr = np.array(reconstructed_image_neqr, dtype=np.float32)
-
 
     return img_recon_neqr
 
@@ -445,7 +472,7 @@ def convert_deconvert_image_qcht_nass(image_path, image_size=(128, 128)) -> np.n
     return reconstructed_state
 
 
-def convert_deconvert_image_qcht_frqi(image_path, image_size=(128, 128))-> np.ndarray:
+def convert_deconvert_image_qcht_frqi(image_path, image_size=(128, 128)) -> np.ndarray:
     """
    :param image_path: path of image to be pipelined
    :param image_size: size of image. CORRESPONDS TO ORDER DEPENDING ON STATE (FRQI HERE)
@@ -455,7 +482,6 @@ def convert_deconvert_image_qcht_frqi(image_path, image_size=(128, 128))-> np.nd
     frqi_encoded_image, n = timer(frqi_encode_image)(image_path, image_size)
     transformed_image = timer(qcht_on_frqi_image)(frqi_encoded_image, n)
     detransformed_image = timer(inverse_qcht_image_frqi)(transformed_image, n)
-
 
     n_pixels = 2 ** (2 * n)
     # --------------------------------------------------

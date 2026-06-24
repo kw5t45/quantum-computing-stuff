@@ -9,7 +9,7 @@ def timer(func):
         result = func(*args, **kwargs)
 
         end = time.perf_counter()
-        print(fr"Function '{func.__name__}' took {end-start:.4f} sec")
+        #print(fr"Function '{func.__name__}' took {end-start:.4f} sec")
 
         return result
 
